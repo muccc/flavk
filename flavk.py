@@ -3,7 +3,8 @@
 import argparse
 import telnetlib as t
 
-from flask import Flask, request, render_template, redirect
+from flask import Flask, request, render_template, redirect, g
+from functools import wraps
 from time import sleep
 
 pioneer = ("83.133.178.82", 23)
@@ -23,11 +24,26 @@ lautsprecherOptions = {
 
 app = Flask(__name__)
 
+def sessionWrapper(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        try:
+            g.s = getSession()
+        except Exception as e:
+            msg = "Connection to the receiver could not be established. Please check that the device is powered. (%s)" % e
+            return render_template("error.html", msg=msg), 500
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    return render_template("error.html", msg=e), 500
+
 def sendCommand(command, session):
     session.write(command.encode('ascii') + b"\r")
 
-def getSession(target = pioneer):
-    return t.Telnet(target[0],target[1])
+def getSession(target = pioneer, timeout = 5):
+    return t.Telnet(target[0],target[1],timeout=timeout)
 
 def powerOn(session):
     sendCommand("PO", session)
@@ -40,16 +56,13 @@ def getPowerStatus(session):
     sendCommand("?P", session)
     return "PWR0" in session.read_some().decode('ascii')
 
-def setUp():
-    s = getSession()
-    on = getPowerStatus(s)
+def setUp(session):
+    on = getPowerStatus(session)
 
     if not on:
-        powerOn(s)
+        powerOn(session)
         sleep(0.1)
-        sendCommand(lautsprecherOptions["alle"]+"SPK",s)
-
-    return s
+        sendCommand(lautsprecherOptions["alle"]+"SPK",session)
 
 def renderedIndex():
     lautsprecher = list(lautsprecherOptions.keys())
@@ -62,30 +75,32 @@ def index():
     return renderedIndex()
 
 @app.route("/receiver/setups/<setting>")
+@sessionWrapper
 def setups(setting):
-    s = setUp()
+    setUp(g.s)
 
     if setting in setupCommands.keys():
         for command in setupCommands[setting]:
-            sendCommand(command, s)
+            sendCommand(command, g.s)
     return redirect("/")
 
 @app.route("/receiver/power/<state>")
+@sessionWrapper
 def power(state):
     if state == "on":
-        s = setUp()
+        setUp(g.s)
     elif state == "off":
-        s = getSession()
-        powerOff(s)
+        powerOff(g.s)
     return redirect("/")
 
 @app.route("/receiver/lautsprecher")
+@sessionWrapper
 def lautsprecher():
-    s = setUp()
+    setUp(g.s)
 
     choice = request.args.get('welche')
     if choice in lautsprecherOptions.keys():
-        sendCommand(lautsprecherOptions[choice]+"SPK",s)
+        sendCommand(lautsprecherOptions[choice]+"SPK",g.s)
     return redirect("/")
 
 if __name__ == "__main__":
