@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import telnetlib as t
 
 from flask import Flask, request, render_template, redirect
@@ -41,7 +42,6 @@ def getPowerStatus(session):
 
 def setUp():
     s = getSession()
-
     on = getPowerStatus(s)
 
     if not on:
@@ -83,11 +83,14 @@ def power(state):
 def lautsprecher():
     s = setUp()
 
-
     choice = request.args.get('welche')
     if choice in lautsprecherOptions.keys():
         sendCommand(lautsprecherOptions[choice]+"SPK",s)
     return redirect("/")
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5002)
+    parser = argparse.ArgumentParser(description='Hauptraum AV Setup Control Server')
+    parser.add_argument('--port', '-p', type=int, default=5002)
+    args = parser.parse_args()
+
+    app.run(host='0.0.0.0', port=args.port)
