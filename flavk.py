@@ -11,8 +11,7 @@ pioneer = ("83.133.178.82", 23)
 
 setupCommands = {
     "tisch": ("04FN",),
-    "sofa-klinke": ("01FN",),
-    "sofa-hdmi": ("10FN",),
+    "sofa": ("15FN",),
 }
 
 lautsprecherOptions = {
